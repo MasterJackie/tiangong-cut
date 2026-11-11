@@ -1,0 +1,17 @@
+# temp files
+.DS_Store
+*.log
+/tmp/
+
+# local dev tools (not game content)
+tools/
+*.pyc
+__pycache__/
+
+# gh cli token
+.gh/
+
+# editor
+.idea/
+.vscode/
+*.swp

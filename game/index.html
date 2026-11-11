@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0E0B09">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>大闹天宫 · 切果</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="720" height="1280"></canvas>
+
+    <!-- 屏幕特效层 -->
+    <div id="fxLayer" class="fx-layer">
+      <div class="fx-halluc"></div>
+      <div class="fx-slow"></div>
+      <div class="fx-damage" id="fxDamage"></div>
+      <div class="fx-vignette"></div>
+    </div>
+
+    <!-- 战斗 HUD -->
+    <div id="hud" class="hud hidden">
+      <div class="hud-top">
+        <div class="scene-chip">
+          <span class="scene-index" id="sceneIndex">第一场</span>
+          <span class="scene-name" id="sceneName">蟠桃园</span>
+        </div>
+        <div class="hud-btns">
+          <button id="soundBtn" class="icon-btn" aria-label="声音"></button>
+          <button id="pauseBtn" class="icon-btn" aria-label="暂停">
+            <span class="pause-bars"><i></i><i></i></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="hud-score-row">
+        <div class="hearts" id="hearts"></div>
+        <div class="score-block">
+          <div class="score-num" id="scoreNum">0</div>
+          <div class="score-cap">蟠 桃 积 分</div>
+        </div>
+        <div class="combo-chip" id="comboChip">
+          <b id="comboNum">0</b><span>连击</span>
+        </div>
+      </div>
+
+      <div class="rivals" id="rivals"></div>
+
+      <div class="weapon-badge" id="weaponBadge">
+        <div class="wb-ring" id="wbRing">
+          <img id="wbIcon" alt="">
+          <span class="wb-time" id="wbTime">10</span>
+        </div>
+        <div class="wb-text">
+          <b id="wbName">金箍棒</b>
+          <span id="wbEffect">横扫千军</span>
+        </div>
+      </div>
+
+      <div class="hint" id="hint">按住滑动 · 切开仙果</div>
+    </div>
+
+    <!-- 飘字与横幅 -->
+    <div id="banner" class="banner"></div>
+    <div id="toasts" class="toasts"></div>
+
+    <!-- 开始 / 选人 -->
+    <section id="menu" class="screen menu">
+      <div class="menu-hero">
+        <img src="assets/hero.jpg" alt="天庭三大反骨仔">
+        <div class="menu-hero-mask"></div>
+        <div class="menu-title">
+          <div class="title-seal">切</div>
+          <h1>大闹天宫</h1>
+          <p class="title-sub">蟠 桃 会 · 三 反 骨 仔 之 争</p>
+        </div>
+        <div class="menu-hero-meta"><span>天历 · 蟠桃盛会</span><span>一刀定乾坤</span></div>
+      </div>
+
+      <div class="menu-body">
+        <div class="pick-head">
+          <span class="line"></span>
+          <em>选择你的反骨仔</em>
+          <span class="line"></span>
+        </div>
+        <div class="char-row" id="charRow"></div>
+        <div class="passive-card">
+          <div class="passive-name"><span id="passiveTitle">齐天大圣</span><b id="passiveName">孙悟空</b></div>
+          <p id="passiveDesc">连击判定窗口 +0.25 秒，连招更从容。</p>
+        </div>
+
+        <button id="startBtn" class="start-btn">
+          <span class="sb-main">入 场</span>
+          <span class="sb-sub">开始切果</span>
+        </button>
+
+        <div class="rules">
+          <div class="rule"><i class="dot gold"></i><b>切果得分</b><span>连击叠加倍率，一刀多果另有重赏</span></div>
+          <div class="rule"><i class="dot red"></i><b>小心凶物</b><span>炸弹、烂桃扣血，毒菇致幻</span></div>
+          <div class="rule"><i class="dot violet"></i><b>夺取法宝</b><span>水晶果藏神兵，十秒神威</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 暂停 -->
+    <section id="pause" class="screen pause hidden">
+      <div class="modal">
+        <div class="modal-seal">停</div>
+        <h2>暂 停</h2>
+        <p class="modal-sub">蟠桃会暂歇，仙乐未停</p>
+        <div class="modal-actions">
+          <button id="resumeBtn" class="btn primary">继续切果</button>
+          <button id="restartBtn" class="btn">重新开局</button>
+          <button id="quitBtn" class="btn ghost">换人再战</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 结算 -->
+    <section id="gameover" class="screen over hidden">
+      <div class="over-inner">
+        <div class="over-head">
+          <div class="modal-seal red">终</div>
+          <p class="over-kicker" id="overKicker">蟠桃会 · 终局</p>
+          <h2 id="overTitle">力竭退场</h2>
+          <p class="over-rank" id="overRank">位列第三</p>
+        </div>
+
+        <div class="over-score">
+          <span class="os-cap">总积分</span>
+          <b id="overScore">0</b>
+        </div>
+
+        <div class="over-stats">
+          <div class="stat"><b id="overCombo">0</b><span>最高连击</span></div>
+          <div class="stat"><b id="overFruits">0</b><span>切果数</span></div>
+          <div class="stat"><b id="overBest">0</b><span>单刀最高</span></div>
+        </div>
+
+        <div class="over-board" id="overBoard"></div>
+
+        <div class="modal-actions">
+          <button id="againBtn" class="btn primary">再来一局</button>
+          <button id="menuBtn" class="btn ghost">换人再战</button>
+        </div>
+        <p class="over-tip">提示：水晶果每 20 秒左右出现一次，别错过。</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="rotateTip" class="rotate-tip">请横屏或放大窗口体验</div>
+</div>
+
+<script src="js/sfx.js"></script>
+<script src="js/game.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
