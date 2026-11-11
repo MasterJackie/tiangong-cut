@@ -61,31 +61,75 @@
     'char-wukong', 'char-nezha', 'char-erlang', 'hero'
   ];
 
+  // 进场前必须到齐的素材：缺任何一张都会出现"看不见却被扣血"的物体
+  var CORE_ASSETS = [
+    'bg-garden',
+    'spr-fruit-peach', 'spr-fruit-flatpeach', 'spr-fruit-ginseng',
+    'spr-fruit-lychee', 'spr-fruit-cherry', 'spr-fruit-melon',
+    'spr-hazard-bomb', 'spr-hazard-rotten', 'spr-hazard-mushroom',
+    'spr-crystal'
+  ];
+
   var IMG = {};
   var loadStarted = false;
+
+  function assetSrc(key, retry) {
+    var ext = (key.indexOf('char-') === 0 || key === 'hero' || key.indexOf('bg-') === 0) ? '.jpg' : '.png';
+    return 'assets/' + key + ext + '?v=3' + (retry ? '&retry=' + retry : '');
+  }
+
+  function isReady(key) {
+    var im = IMG[key];
+    return !!(im && im.width);
+  }
+
+  // 单张加载，失败重试两次，最终失败也回调（isReady 会返回 false）
+  function loadOne(key, onDone) {
+    var im = new Image();
+    var tries = 0;
+    IMG[key] = im;
+    function done() {
+      im.onload = im.onerror = null;
+      if (onDone) onDone();
+    }
+    im.onload = done;
+    im.onerror = function () {
+      if (++tries <= 2) {
+        setTimeout(function () { im.src = assetSrc(key, tries); }, 500 * tries);
+        return;
+      }
+      done();
+    };
+    im.src = assetSrc(key);
+  }
 
   function loadAssets(cb, onProgress) {
     if (loadStarted) { cb(); return; }
     loadStarted = true;
-    var total = ASSETS.length, done = 0, fired = false;
+
+    var done = 0, total = CORE_ASSETS.length, fired = false;
     function finish() {
       if (fired) return;
       fired = true;
       cb();
     }
-    ASSETS.forEach(function (key) {
-      var im = new Image();
-      im.onload = im.onerror = function () {
-        im.onload = im.onerror = null;
+
+    CORE_ASSETS.forEach(function (key) {
+      loadOne(key, function () {
         done++;
         if (onProgress) onProgress(done, total);
         if (done >= total) finish();
-      };
-      im.src = 'assets/' + key + (key.indexOf('char-') === 0 || key === 'hero' || key.indexOf('bg-') === 0 ? '.jpg' : '.png');
-      IMG[key] = im;
+      });
     });
-    // 兜底：弱网下个别图片可能长时间不回调，到点先放行，避免按钮一直禁用
-    setTimeout(finish, 4000);
+
+    // 背景、角色、武器图标不阻塞开场，后台继续加载
+    ASSETS.forEach(function (key) {
+      if (CORE_ASSETS.indexOf(key) >= 0) return;
+      loadOne(key, null);
+    });
+
+    // 极端情况下不无限等待；未就绪的素材不会生成对应物体
+    setTimeout(finish, 15000);
   }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
@@ -467,24 +511,40 @@
 
   Game.prototype._spawnOne = function (diff) {
     if (this.state !== 'playing' || this.dying) return;
-    var x = rand(100, W - 100);
-    var obj = this._baseObject(x, H + 150, (W / 2 - x) * 0.14 + rand(-90, 90), 0);
-    obj.kind = 'fruit';
 
+    // 任何一张图没就绪都不生成，避免出现看不见却会扣血的物体
     var roll = Math.random();
     var hazardChance = 0.155 + diff * 0.105;
+    var kind, ft, hz;
     if (roll < 0.035) {
-      // 发光蟠桃
-      obj.kind = 'heal';
+      kind = 'heal';
+    } else if (roll < 0.035 + hazardChance) {
+      kind = 'hazard';
+      hz = HAZARDS[Math.random() < 0.4 ? 0 : Math.random() < 0.55 ? 1 : 2];
+      if (!isReady(hz.img)) return;
+    } else {
+      kind = 'fruit';
+      var avail = [];
+      for (var fi = 0; fi < FRUITS.length; fi++) {
+        if (isReady(FRUITS[fi].img)) avail.push(FRUITS[fi]);
+      }
+      if (!avail.length) return;
+      ft = pickWeighted(avail);
+    }
+    if (kind === 'heal' && !isReady('spr-fruit-peach')) return;
+
+    var x = rand(100, W - 100);
+    var obj = this._baseObject(x, H + 150, (W / 2 - x) * 0.14 + rand(-90, 90), 0);
+    obj.kind = kind;
+
+    if (kind === 'heal') {
       obj.img = IMG['spr-fruit-peach'];
       obj.h = 156;
       obj.w = obj.h * (obj.img.width / obj.img.height);
       obj.r = obj.h * 0.42;
       obj.glow = '#FFD978';
       obj.value = 0;
-    } else if (roll < 0.035 + hazardChance) {
-      var hz = HAZARDS[Math.random() < 0.4 ? 0 : Math.random() < 0.55 ? 1 : 2];
-      obj.kind = 'hazard';
+    } else if (kind === 'hazard') {
       obj.hazard = hz.type;
       obj.img = IMG[hz.img];
       obj.h = hz.h;
@@ -492,7 +552,6 @@
       obj.r = hz.radius;
       obj.glow = hz.color;
     } else {
-      var ft = pickWeighted(FRUITS);
       obj.fruit = ft.type;
       obj.img = IMG[ft.img];
       obj.h = ft.h;
@@ -506,6 +565,7 @@
 
   Game.prototype._spawnCrystal = function () {
     if (this.state !== 'playing' || this.dying) return;
+    if (!isReady('spr-crystal')) return;
     var x = rand(180, W - 180);
     var obj = this._baseObject(x, H + 140, rand(-50, 50), 0);
     obj.kind = 'crystal';
