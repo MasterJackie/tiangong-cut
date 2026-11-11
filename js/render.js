@@ -7,6 +7,12 @@
 
   function rand(a, b) { return a + Math.random() * (b - a); }
 
+  // 绘制图集精灵：spr = {atlas, sx, sy, sw, sh}
+  function drawSpr(ctx, spr, x, y, w, h) {
+    if (!spr || !spr.atlas || !spr.atlas.width) return;
+    ctx.drawImage(spr.atlas, spr.sx, spr.sy, spr.sw, spr.sh, x, y, w, h);
+  }
+
   TG.Game.prototype.render = function () {
     var ctx = this.ctx;
     ctx.setTransform(this.dpr || 1, 0, 0, this.dpr || 1, 0, 0);
@@ -149,7 +155,7 @@
         ctx.shadowBlur = 14;
         ctx.shadowOffsetY = 6;
       }
-      ctx.drawImage(o.img, -o.w / 2, -o.h / 2, o.w, o.h);
+      drawSpr(ctx, o.img, -o.w / 2, -o.h / 2, o.w, o.h);
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
 
@@ -209,7 +215,7 @@
 
       ctx.shadowColor = 'rgba(0,0,0,.55)';
       ctx.shadowBlur = 12;
-      ctx.drawImage(h.img, -h.w / 2, -h.h / 2, h.w, h.h);
+      drawSpr(ctx, h.img, -h.w / 2, -h.h / 2, h.w, h.h);
       ctx.restore();
     }
   };
@@ -365,7 +371,7 @@
           ctx.save();
           ctx.translate(o.x, o.y);
           ctx.rotate(o.rot);
-          ctx.drawImage(o.img, -o.w / 2, -o.h / 2, o.w, o.h);
+          drawSpr(ctx, o.img, -o.w / 2, -o.h / 2, o.w, o.h);
           ctx.restore();
         }
         ctx.restore();

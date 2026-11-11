@@ -52,99 +52,115 @@
     { name: '凌霄殿', index: '第三场', bg: 'bg-lingxiao', tint: 'rgba(16,22,64,.26)', dim: 0.10 }
   ];
 
+  // 图集坐标：[x, y, w, h]，所有可切物体共用一张图，进场只需一个请求
+  var ATLAS = {
+    'spr-fruit-ginseng': [0, 0, 286, 320],
+    'spr-fruit-lychee': [288, 0, 281, 320],
+    'spr-fruit-cherry': [571, 0, 285, 320],
+    'spr-fruit-melon': [858, 0, 133, 320],
+    'spr-hazard-bomb': [0, 322, 218, 320],
+    'spr-crystal': [220, 322, 320, 315],
+    'spr-fruit-peach': [542, 322, 320, 309],
+    'spr-fruit-flatpeach': [0, 644, 320, 302],
+    'spr-hazard-rotten': [322, 644, 320, 291],
+    'spr-hazard-mushroom': [644, 644, 320, 282]
+  };
+
+  // 背景、角色、武器徽章走独立文件
   var ASSETS = [
     'bg-garden', 'bg-yaochi', 'bg-lingxiao',
-    'spr-fruit-peach', 'spr-fruit-flatpeach', 'spr-fruit-ginseng',
-    'spr-fruit-lychee', 'spr-fruit-cherry', 'spr-fruit-melon',
-    'spr-hazard-bomb', 'spr-hazard-rotten', 'spr-hazard-mushroom',
-    'spr-crystal', 'wp-staff', 'wp-spear', 'wp-trident',
+    'wp-staff', 'wp-spear', 'wp-trident',
     'char-wukong', 'char-nezha', 'char-erlang', 'hero'
   ];
 
-  // 进场前必须到齐的素材：缺任何一张都会出现"看不见却被扣血"的物体
-  var CORE_ASSETS = [
-    'bg-garden',
-    'spr-fruit-peach', 'spr-fruit-flatpeach', 'spr-fruit-ginseng',
-    'spr-fruit-lychee', 'spr-fruit-cherry', 'spr-fruit-melon',
-    'spr-hazard-bomb', 'spr-hazard-rotten', 'spr-hazard-mushroom',
-    'spr-crystal'
-  ];
-
   var IMG = {};
+  var SPR = {};
   var loadStarted = false;
 
   function assetSrc(key, retry) {
     var ext = (key.indexOf('char-') === 0 || key === 'hero' || key.indexOf('bg-') === 0) ? '.jpg' : '.png';
-    return 'assets/' + key + ext + '?v=3' + (retry ? '&retry=' + retry : '');
+    return 'assets/' + key + ext + '?v=4' + (retry ? '&retry=' + retry : '');
   }
 
   function isReady(key) {
+    var s = SPR[key];
+    if (s) return !!(s.atlas && s.atlas.width);
     var im = IMG[key];
     return !!(im && im.width);
   }
 
-  // 单张加载，失败重试两次，最终失败也回调（isReady 会返回 false）
-  function loadOne(key, onDone) {
-    var im = new Image();
+  // 失败重试两次，最终失败也回调（由 isReady 判定不可用）
+  function withRetry(im, src, onDone) {
     var tries = 0;
-    IMG[key] = im;
     function done() {
       im.onload = im.onerror = null;
-      if (onDone) onDone();
+      onDone();
     }
     im.onload = done;
     im.onerror = function () {
       if (++tries <= 2) {
-        setTimeout(function () { im.src = assetSrc(key, tries); }, 500 * tries);
+        setTimeout(function () { im.src = src(tries); }, 500 * tries);
         return;
       }
       done();
     };
-    im.src = assetSrc(key);
+    im.src = src(0);
   }
 
-  var CORE_FRUITS = ['spr-fruit-peach', 'spr-fruit-flatpeach', 'spr-fruit-ginseng', 'spr-fruit-lychee', 'spr-fruit-cherry', 'spr-fruit-melon'];
-  var CORE_HAZARDS = ['spr-hazard-bomb', 'spr-hazard-rotten', 'spr-hazard-mushroom'];
+  function loadOne(key, onDone) {
+    var im = new Image();
+    IMG[key] = im;
+    withRetry(im, function (r) { return assetSrc(key, r); }, function () {
+      if (onDone) onDone();
+    });
+  }
 
-  // 开局门槛：背景 + 至少 3 种水果 + 2 种凶物 + 水晶果。
-  // 没到齐的类型一律不生成，避免出现看不见却会扣血的物体。
-  function coreReady() {
-    if (!isReady('bg-garden') || !isReady('spr-crystal')) return false;
-    var f = 0, h = 0, i;
-    for (i = 0; i < CORE_FRUITS.length; i++) if (isReady(CORE_FRUITS[i])) f++;
-    for (i = 0; i < CORE_HAZARDS.length; i++) if (isReady(CORE_HAZARDS[i])) h++;
-    return f >= 3 && h >= 2;
+  // 加载图集，成功后把每个精灵的源矩形填进 SPR
+  function loadAtlas(onDone) {
+    var im = new Image();
+    withRetry(im, function (r) {
+      return 'assets/atlas.png?v=4' + (r ? '&retry=' + r : '');
+    }, function () {
+      Object.keys(ATLAS).forEach(function (k) {
+        var c = ATLAS[k];
+        SPR[k] = { atlas: im, sx: c[0], sy: c[1], sw: c[2], sh: c[3], width: c[2], height: c[3] };
+      });
+      onDone(!!(im.width));
+    });
   }
 
   function loadAssets(cb, onProgress, onStall) {
     if (loadStarted) { cb(); return; }
     loadStarted = true;
 
-    var done = 0, total = CORE_ASSETS.length, fired = false, fuse;
+    var done = 0, total = 2, fired = false, fuse;
     function finish() {
       if (fired) return;
       fired = true;
       clearTimeout(fuse);
       cb();
     }
+    function tick() {
+      done++;
+      if (onProgress) onProgress(done, total);
+      if (done >= total) finish();
+    }
 
-    CORE_ASSETS.forEach(function (key) {
-      loadOne(key, function () {
-        done++;
-        if (onProgress) onProgress(done, total);
-        if (coreReady()) finish();
-      });
+    // 开场只要两个请求：图集 + 首张背景
+    loadAtlas(function (ok) {
+      if (!ok) { if (onStall) onStall(0, total); return; }
+      tick();
     });
+    loadOne('bg-garden', tick);
 
-    // 背景、角色、武器图标不阻塞开场，后台继续加载
+    // 其余素材后台加载，不阻塞开场
     ASSETS.forEach(function (key) {
-      if (CORE_ASSETS.indexOf(key) >= 0) return;
+      if (key === 'bg-garden') return;
       loadOne(key, null);
     });
 
-    // 保险丝：慢到连最低门槛都凑不齐时，提示用户重试，而不是放进空场景
     fuse = setTimeout(function () {
-      if (coreReady()) { finish(); return; }
+      if (done >= total) { finish(); return; }
       if (onStall) onStall(done, total);
     }, 18000);
   }
@@ -555,7 +571,7 @@
     obj.kind = kind;
 
     if (kind === 'heal') {
-      obj.img = IMG['spr-fruit-peach'];
+      obj.img = SPR['spr-fruit-peach'];
       obj.h = 156;
       obj.w = obj.h * (obj.img.width / obj.img.height);
       obj.r = obj.h * 0.42;
@@ -563,14 +579,14 @@
       obj.value = 0;
     } else if (kind === 'hazard') {
       obj.hazard = hz.type;
-      obj.img = IMG[hz.img];
+      obj.img = SPR[hz.img];
       obj.h = hz.h;
       obj.w = obj.h * (obj.img.width / obj.img.height);
       obj.r = hz.radius;
       obj.glow = hz.color;
     } else {
       obj.fruit = ft.type;
-      obj.img = IMG[ft.img];
+      obj.img = SPR[ft.img];
       obj.h = ft.h;
       obj.w = obj.h * (obj.img.width / obj.img.height);
       obj.r = Math.max(obj.w, obj.h) * 0.40;
@@ -586,7 +602,7 @@
     var x = rand(180, W - 180);
     var obj = this._baseObject(x, H + 140, rand(-50, 50), 0);
     obj.kind = 'crystal';
-    obj.img = IMG['spr-crystal'];
+    obj.img = SPR['spr-crystal'];
     obj.h = 168;
     obj.w = obj.h * (obj.img.width / obj.img.height);
     obj.r = obj.h * 0.44;
@@ -915,4 +931,5 @@
   window.TG.FRUITS = FRUITS;
   window.TG.loadAssets = loadAssets;
   window.TG.IMG = IMG;
+  window.TG.SPR = SPR;
 })();
