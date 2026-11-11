@@ -314,11 +314,11 @@
   }
 
   startBtn.addEventListener('click', function () {
-    TG.sfx.unlock();
-    TG.sfx.play('click');
     hideScreens();
     stage.classList.remove('on-halluc', 'on-slow');
     game.start(selected);
+    TG.sfx.unlock();
+    TG.sfx.play('click');
     setTimeout(function () { showBanner('蟠 桃 会', '开 宴', ''); }, 220);
   });
 
@@ -411,5 +411,8 @@
   TG.loadAssets(function () {
     startBtn.disabled = false;
     sbSub.textContent = '开始切果';
+  }, function (done, total) {
+    if (!startBtn.disabled) return;
+    sbSub.textContent = '铺 开 画 卷 ' + done + '/' + total;
   });
 })();

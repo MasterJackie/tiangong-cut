@@ -11,23 +11,29 @@
   }
 
   Sfx.prototype.unlock = function () {
-    if (this.ctx) {
-      if (this.ctx.state === 'suspended') this.ctx.resume();
-      return;
-    }
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    this.ctx = new AC();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = 0.55;
-    this.master.connect(this.ctx.destination);
+    try {
+      if (this.ctx) {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return;
+      }
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.55;
+      this.master.connect(this.ctx.destination);
 
-    // 预生成 1 秒白噪声
-    var len = this.ctx.sampleRate;
-    var buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    this.noise = buf;
+      // 预生成 1 秒白噪声
+      var len = this.ctx.sampleRate;
+      var buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noise = buf;
+    } catch (e) {
+      // 某些移动端内核对 WebAudio 支持不全，静默降级为无声
+      this.ctx = null;
+      this.master = null;
+    }
   };
 
   Sfx.prototype.setMuted = function (m) {
