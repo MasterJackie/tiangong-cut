@@ -314,6 +314,10 @@
   }
 
   startBtn.addEventListener('click', function () {
+    if (startBtn.dataset.retry) {
+      location.reload();
+      return;
+    }
     hideScreens();
     stage.classList.remove('on-halluc', 'on-slow');
     game.start(selected);
@@ -409,10 +413,15 @@
   var sbSub = startBtn.querySelector('.sb-sub');
   sbSub.textContent = '铺 开 画 卷 …';
   TG.loadAssets(function () {
+    delete startBtn.dataset.retry;
     startBtn.disabled = false;
     sbSub.textContent = '开始切果';
   }, function (done, total) {
     if (!startBtn.disabled) return;
     sbSub.textContent = '铺 开 画 卷 ' + done + '/' + total;
+  }, function (done, total) {
+    startBtn.dataset.retry = '1';
+    startBtn.disabled = false;
+    sbSub.textContent = '仙图未至 ' + done + '/' + total + ' · 点此重试';
   });
 })();
