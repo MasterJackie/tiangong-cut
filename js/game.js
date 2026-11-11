@@ -103,14 +103,28 @@
     im.src = assetSrc(key);
   }
 
-  function loadAssets(cb, onProgress) {
+  var CORE_FRUITS = ['spr-fruit-peach', 'spr-fruit-flatpeach', 'spr-fruit-ginseng', 'spr-fruit-lychee', 'spr-fruit-cherry', 'spr-fruit-melon'];
+  var CORE_HAZARDS = ['spr-hazard-bomb', 'spr-hazard-rotten', 'spr-hazard-mushroom'];
+
+  // 开局门槛：背景 + 至少 3 种水果 + 2 种凶物 + 水晶果。
+  // 没到齐的类型一律不生成，避免出现看不见却会扣血的物体。
+  function coreReady() {
+    if (!isReady('bg-garden') || !isReady('spr-crystal')) return false;
+    var f = 0, h = 0, i;
+    for (i = 0; i < CORE_FRUITS.length; i++) if (isReady(CORE_FRUITS[i])) f++;
+    for (i = 0; i < CORE_HAZARDS.length; i++) if (isReady(CORE_HAZARDS[i])) h++;
+    return f >= 3 && h >= 2;
+  }
+
+  function loadAssets(cb, onProgress, onStall) {
     if (loadStarted) { cb(); return; }
     loadStarted = true;
 
-    var done = 0, total = CORE_ASSETS.length, fired = false;
+    var done = 0, total = CORE_ASSETS.length, fired = false, fuse;
     function finish() {
       if (fired) return;
       fired = true;
+      clearTimeout(fuse);
       cb();
     }
 
@@ -118,7 +132,7 @@
       loadOne(key, function () {
         done++;
         if (onProgress) onProgress(done, total);
-        if (done >= total) finish();
+        if (coreReady()) finish();
       });
     });
 
@@ -128,8 +142,11 @@
       loadOne(key, null);
     });
 
-    // 保险丝：极端情况下不无限等待（正常的成功/重试失败都会先走完上面的回调）
-    setTimeout(finish, 20000);
+    // 保险丝：慢到连最低门槛都凑不齐时，提示用户重试，而不是放进空场景
+    fuse = setTimeout(function () {
+      if (coreReady()) { finish(); return; }
+      if (onStall) onStall(done, total);
+    }, 18000);
   }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
