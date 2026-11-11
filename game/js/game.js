@@ -128,8 +128,8 @@
       loadOne(key, null);
     });
 
-    // 极端情况下不无限等待；未就绪的素材不会生成对应物体
-    setTimeout(finish, 15000);
+    // 保险丝：极端情况下不无限等待（正常的成功/重试失败都会先走完上面的回调）
+    setTimeout(finish, 20000);
   }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
