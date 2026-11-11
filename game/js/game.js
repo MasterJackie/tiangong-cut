@@ -64,19 +64,28 @@
   var IMG = {};
   var loadStarted = false;
 
-  function loadAssets(cb) {
+  function loadAssets(cb, onProgress) {
     if (loadStarted) { cb(); return; }
     loadStarted = true;
-    var total = ASSETS.length, done = 0;
+    var total = ASSETS.length, done = 0, fired = false;
+    function finish() {
+      if (fired) return;
+      fired = true;
+      cb();
+    }
     ASSETS.forEach(function (key) {
       var im = new Image();
       im.onload = im.onerror = function () {
+        im.onload = im.onerror = null;
         done++;
-        if (done === total) cb();
+        if (onProgress) onProgress(done, total);
+        if (done >= total) finish();
       };
       im.src = 'assets/' + key + (key.indexOf('char-') === 0 || key === 'hero' || key.indexOf('bg-') === 0 ? '.jpg' : '.png');
       IMG[key] = im;
     });
+    // 兜底：弱网下个别图片可能长时间不回调，到点先放行，避免按钮一直禁用
+    setTimeout(finish, 4000);
   }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
